@@ -1,18 +1,18 @@
 package main
 
 import (
-"bytes"
-"encoding/json"
-"encoding/xml"
-"fmt"
-"html"
-"io"
-"io/ioutil"
-"log"
-"net/http"
-"net/url"
-"os"
-"strings"
+	"bytes"
+	"encoding/json"
+	"encoding/xml"
+	"fmt"
+	"html"
+	"io"
+	"io/ioutil"
+	"log"
+	"net/http"
+	"net/url"
+	"os"
+	"strings"
 )
 
 const (
