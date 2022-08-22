@@ -1,4 +1,4 @@
-package main
+package salesforce_logs_receiver
 
 import (
 	"bytes"
