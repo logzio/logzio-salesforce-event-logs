@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	defaultApiVersion = "55.0"
+	defaultApiVersion       = "55.0"
 	eventLogFileSObjectName = "eventlogfile"
 )
 
@@ -99,7 +99,6 @@ func (slr *SalesforceLogsReceiver) CollectSObject(sObjectName string) error {
 			}
 		}
 
-
 	}
 
 	return nil
@@ -119,7 +118,7 @@ func (slr *SalesforceLogsReceiver) handleEventLogFileSObject(data *simpleforce.S
 	return jsonData, nil
 }
 
-func (slr *SalesforceLogsReceiver) getEventLogFileContent(data *simpleforce.SObject) (map[string]interface{}, error){
+func (slr *SalesforceLogsReceiver) getEventLogFileContent(data *simpleforce.SObject) (map[string]interface{}, error) {
 	apiPath := data.StringField("LogFile")
 	logFileContent, err := slr.getFileContent(apiPath)
 	if err != nil {
@@ -134,17 +133,17 @@ func (slr *SalesforceLogsReceiver) getEventLogFileContent(data *simpleforce.SObj
 		return nil, fmt.Errorf("error reading CSV data: %w", err)
 	}
 
-	csvMap := make(map[string]interface{}, 0)
+	logEvent := make(map[string]interface{}, 0)
 	for index, value := range csvData {
 		if index == 0 {
 			continue
 		}
 
 		key := csvData[0][index-1]
-		csvMap[key] = value[index-1]
+		logEvent[key] = value[index-1]
 	}
 
-	return csvMap, nil
+	return logEvent, nil
 }
 
 func (slr *SalesforceLogsReceiver) getFileContent(apiPath string) ([]byte, error) {
