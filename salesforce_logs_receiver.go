@@ -5,28 +5,38 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"github.com/simpleforce/simpleforce"
 	"io"
 	"net/http"
 	"strings"
-
-	"github.com/simpleforce/simpleforce"
 )
 
 const (
+	EventLogFileSObjectName = "eventlogfile"
 	defaultApiVersion       = "55.0"
-	eventLogFileSObjectName = "eventlogfile"
 )
 
 type SalesforceLogsReceiver struct {
-	SObjectNames []string
-
+	sObjects      []*SObjectToCollect
 	username      string
 	password      string
 	securityToken string
 	client        *simpleforce.Client
 }
 
-func NewSalesLogsReceiver(url string, clientID string, apiVersion string, username string, password string, securityToken string, sObjectNames []string) (*SalesforceLogsReceiver, error) {
+type SObjectToCollect struct {
+	SObjectName     string
+	LatestTimestamp string
+}
+
+func NewSalesforceLogsReceiver(
+	url string,
+	clientID string,
+	apiVersion string,
+	username string,
+	password string,
+	securityToken string,
+	sObjects []*SObjectToCollect) (*SalesforceLogsReceiver, error) {
 	if clientID == "" {
 		return nil, fmt.Errorf("client ID must have a value")
 	}
@@ -43,8 +53,14 @@ func NewSalesLogsReceiver(url string, clientID string, apiVersion string, userna
 		return nil, fmt.Errorf("security token must have a value")
 	}
 
-	if len(sObjectNames) == 0 {
+	if len(sObjects) == 0 {
 		return nil, fmt.Errorf("sObjects must have a value")
+	}
+
+	for _, sObject := range sObjects {
+		if sObject.SObjectName == "" {
+			return nil, fmt.Errorf("sObject name must have a value")
+		}
 	}
 
 	if url == "" {
@@ -56,10 +72,12 @@ func NewSalesLogsReceiver(url string, clientID string, apiVersion string, userna
 	}
 
 	client := simpleforce.NewClient(url, clientID, apiVersion)
-	//sObjectsList := strings.Split(sObjects, ",")
+	if client == nil {
+		return nil, fmt.Errorf("error creating Salesforce client")
+	}
 
 	return &SalesforceLogsReceiver{
-		SObjectNames:  sObjectNames,
+		sObjects:      sObjects,
 		username:      username,
 		password:      password,
 		securityToken: securityToken,
@@ -75,36 +93,32 @@ func (slr *SalesforceLogsReceiver) LoginSalesforce() error {
 	return nil
 }
 
-func (slr *SalesforceLogsReceiver) CollectSObject(sObjectName string) error {
-	query := fmt.Sprintf("SELECT Id,CreatedDate FROM %s", sObjectName)
+func (slr *SalesforceLogsReceiver) GetSObjectRecords(sObject *SObjectToCollect) ([]simpleforce.SObject, error) {
+	query := fmt.Sprintf("SELECT Id,CreatedDate FROM %s WHERE CreatedDate > %s", sObject.SObjectName, sObject.LatestTimestamp)
 	result, err := slr.client.Query(query)
 	if err != nil {
-		return fmt.Errorf("error querying Salesforce API: %w", err)
+		return nil, fmt.Errorf("error querying Salesforce API: %w", err)
 	}
 
-	for _, record := range result.Records {
-		id := record.StringField("Id")
-		data := record.Get(id)
-
-		var jsonData []byte
-		jsonData, err = json.Marshal(data)
-		if err != nil {
-			return fmt.Errorf("error marshaling data from Salesforce API: %w", err)
-		}
-
-		if strings.ToLower(sObjectName) == eventLogFileSObjectName {
-			jsonData, err = slr.handleEventLogFileSObject(data, jsonData)
-			if err != nil {
-				return fmt.Errorf("error handling event log file sObject: %w", err)
-			}
-		}
-
-	}
-
-	return nil
+	return result.Records, nil
 }
 
-func (slr *SalesforceLogsReceiver) handleEventLogFileSObject(data *simpleforce.SObject, jsonData []byte) ([]byte, error) {
+func (slr *SalesforceLogsReceiver) CollectSObjectRecord(record *simpleforce.SObject) ([]byte, *string, *string, error) {
+	id := record.StringField("Id")
+	data := record.Get(id)
+
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("error marshaling data from Salesforce API: %w", err)
+	}
+
+	createdDate := record.StringField("CreatedDate")
+	createdDate = strings.Replace(createdDate, "+0000", "Z", 1)
+
+	return jsonData, &id, &createdDate, nil
+}
+
+func (slr *SalesforceLogsReceiver) EnrichEventLogFileSObjectData(data *simpleforce.SObject, jsonData []byte) ([]byte, error) {
 	eventLog, err := slr.getEventLogFileContent(data)
 	if err != nil {
 		return nil, fmt.Errorf("error getting event log file content: %w", err)
