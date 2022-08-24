@@ -5,10 +5,13 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
-	"github.com/simpleforce/simpleforce"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
+
+	"github.com/avast/retry-go"
+	"github.com/simpleforce/simpleforce"
 )
 
 const (
@@ -118,28 +121,34 @@ func (slr *SalesforceLogsReceiver) CollectSObjectRecord(record *simpleforce.SObj
 	return jsonData, &id, &createdDate, nil
 }
 
-func (slr *SalesforceLogsReceiver) EnrichEventLogFileSObjectData(data *simpleforce.SObject, jsonData []byte) ([]byte, error) {
-	eventLog, err := slr.getEventLogFileContent(data)
+func (slr *SalesforceLogsReceiver) EnrichEventLogFileSObjectData(data *simpleforce.SObject, jsonData []byte) ([][]byte, error) {
+	eventLogRows, err := slr.getEventLogFileContent(data)
 	if err != nil {
 		return nil, fmt.Errorf("error getting event log file content: %w", err)
 	}
 
-	jsonData, err = addEventLogToJsonData(eventLog, jsonData)
-	if err != nil {
-		return nil, fmt.Errorf("error adding event log to JSON data: %w", err)
+	var jsonsData [][]byte
+	for _, eventLogRow := range eventLogRows {
+		jsonData, err = addEventLogToJsonData(eventLogRow, jsonData)
+		if err != nil {
+			return nil, fmt.Errorf("error adding event log to JSON data: %w", err)
+		}
+
+		jsonsData = append(jsonsData, jsonData)
 	}
 
-	return jsonData, nil
+	return jsonsData, nil
 }
 
-func (slr *SalesforceLogsReceiver) getEventLogFileContent(data *simpleforce.SObject) (map[string]interface{}, error) {
+func (slr *SalesforceLogsReceiver) getEventLogFileContent(data *simpleforce.SObject) ([]map[string]interface{}, error) {
 	apiPath := data.StringField("LogFile")
 	logFileContent, err := slr.getFileContent(apiPath)
 	if err != nil {
 		return nil, fmt.Errorf("error getting event log file content: %w", err)
 	}
 
-	reader := strings.NewReader(string(logFileContent))
+	trimmedLogFileContent := strings.Replace(string(logFileContent), "\n\n", "\n", -1)
+	reader := strings.NewReader(trimmedLogFileContent)
 	csvReader := csv.NewReader(reader)
 
 	csvData, err := csvReader.ReadAll()
@@ -147,17 +156,22 @@ func (slr *SalesforceLogsReceiver) getEventLogFileContent(data *simpleforce.SObj
 		return nil, fmt.Errorf("error reading CSV data: %w", err)
 	}
 
-	logEvent := make(map[string]interface{}, 0)
-	for index, value := range csvData {
-		if index == 0 {
+	var logEvents []map[string]interface{}
+	for rowIndex, row := range csvData {
+		if rowIndex == 0 {
 			continue
 		}
 
-		key := csvData[0][index-1]
-		logEvent[key] = value[index-1]
+		logEvent := make(map[string]interface{}, 0)
+		for fieldIndex, field := range row {
+			key := csvData[0][fieldIndex]
+			logEvent[key] = field
+		}
+
+		logEvents = append(logEvents, logEvent)
 	}
 
-	return logEvent, nil
+	return logEvents, nil
 }
 
 func (slr *SalesforceLogsReceiver) getFileContent(apiPath string) ([]byte, error) {
@@ -167,16 +181,39 @@ func (slr *SalesforceLogsReceiver) getFileContent(apiPath string) ([]byte, error
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("Authorization", "Bearer "+slr.client.GetSid())
 
-	resp, err := httpClient.Do(req)
+	var resp *http.Response
+	err = retry.Do(
+		func() error {
+			resp, err = httpClient.Do(req)
+			if err != nil {
+				return err
+			}
+
+			if resp.StatusCode < 200 || resp.StatusCode > 299 {
+				buf := new(bytes.Buffer)
+				buf.ReadFrom(resp.Body)
+				return fmt.Errorf("ERROR: statuscode: %d, body: %s", resp.StatusCode, buf.String())
+			}
+
+			return nil
+		},
+		retry.RetryIf(
+			func(err error) bool {
+				result, matchErr := regexp.MatchString("statuscode: 5[0-9]{2}", err.Error())
+				if matchErr != nil {
+					return false
+				}
+				if result {
+					return true
+				}
+
+				return false
+			}),
+		retry.DelayType(retry.BackOffDelay),
+		retry.Attempts(3),
+	)
 	if err != nil {
 		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		buf := new(bytes.Buffer)
-		buf.ReadFrom(resp.Body)
-		return nil, fmt.Errorf("ERROR: statuscode: %d, body: %s", resp.StatusCode, buf.String())
 	}
 
 	var content []byte
