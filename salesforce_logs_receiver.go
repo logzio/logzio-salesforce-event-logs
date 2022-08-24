@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"os"
 	"regexp"
 	"strings"
 
@@ -19,6 +21,10 @@ const (
 	defaultApiVersion       = "55.0"
 )
 
+var (
+	debugLogger = log.New(os.Stderr, "DEBUG: ", log.Ldate|log.Ltime)
+)
+
 type SalesforceLogsReceiver struct {
 	sObjects      []*SObjectToCollect
 	username      string
@@ -28,7 +34,7 @@ type SalesforceLogsReceiver struct {
 }
 
 type SObjectToCollect struct {
-	SObjectName     string
+	SObjectType     string
 	LatestTimestamp string
 }
 
@@ -61,7 +67,7 @@ func NewSalesforceLogsReceiver(
 	}
 
 	for _, sObject := range sObjects {
-		if sObject.SObjectName == "" {
+		if sObject.SObjectType == "" {
 			return nil, fmt.Errorf("sObject name must have a value")
 		}
 	}
@@ -93,50 +99,56 @@ func (slr *SalesforceLogsReceiver) LoginSalesforce() error {
 		return fmt.Errorf("error login Salesforce API: %w", err)
 	}
 
+	debugLogger.Println("Logged in to Salesforce. Got new access token")
 	return nil
 }
 
 func (slr *SalesforceLogsReceiver) GetSObjectRecords(sObject *SObjectToCollect) ([]simpleforce.SObject, error) {
-	query := fmt.Sprintf("SELECT Id,CreatedDate FROM %s WHERE CreatedDate > %s", sObject.SObjectName, sObject.LatestTimestamp)
+	query := fmt.Sprintf("SELECT Id,CreatedDate FROM %s WHERE CreatedDate > %s", sObject.SObjectType, sObject.LatestTimestamp)
 	result, err := slr.client.Query(query)
 	if err != nil {
 		return nil, fmt.Errorf("error querying Salesforce API: %w", err)
 	}
 
+	debugLogger.Println("Got", len(result.Records), "records of sObject", sObject.SObjectType)
 	return result.Records, nil
 }
 
-func (slr *SalesforceLogsReceiver) CollectSObjectRecord(record *simpleforce.SObject) ([]byte, *string, *string, error) {
-	id := record.StringField("Id")
+func (slr *SalesforceLogsReceiver) CollectSObjectRecord(record *simpleforce.SObject) ([]byte, *string, error) {
+	id := record.ID()
 	data := record.Get(id)
 
 	jsonData, err := json.Marshal(data)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("error marshaling data from Salesforce API: %w", err)
+		return nil, nil, fmt.Errorf("error marshaling data from Salesforce API: %w", err)
 	}
 
 	createdDate := record.StringField("CreatedDate")
 	createdDate = strings.Replace(createdDate, "+0000", "Z", 1)
 
-	return jsonData, &id, &createdDate, nil
+	debugLogger.Println("Collected data of sObject", record.Type(), "record ID", id)
+	return jsonData, &createdDate, nil
 }
 
 func (slr *SalesforceLogsReceiver) EnrichEventLogFileSObjectData(data *simpleforce.SObject, jsonData []byte) ([][]byte, error) {
 	eventLogRows, err := slr.getEventLogFileContent(data)
 	if err != nil {
-		return nil, fmt.Errorf("error getting event log file content: %w", err)
+		return nil, fmt.Errorf("error getting EventLogFile sObject log file content: %w", err)
 	}
+
+	debugLogger.Println("Got", len(eventLogRows), "events from EventLogFile sObject ID", data.ID())
 
 	var jsonsData [][]byte
 	for _, eventLogRow := range eventLogRows {
-		jsonData, err = addEventLogToJsonData(eventLogRow, jsonData)
+		newJsonData, err := addEventLogToJsonData(eventLogRow, jsonData)
 		if err != nil {
-			return nil, fmt.Errorf("error adding event log to JSON data: %w", err)
+			return nil, fmt.Errorf("error adding event log content to JSON data: %w", err)
 		}
 
-		jsonsData = append(jsonsData, jsonData)
+		jsonsData = append(jsonsData, newJsonData)
 	}
 
+	debugLogger.Println("Enriched JSON data with", len(jsonsData), "events from EventLogFile sObject ID", data.ID())
 	return jsonsData, nil
 }
 
@@ -148,6 +160,8 @@ func (slr *SalesforceLogsReceiver) getEventLogFileContent(data *simpleforce.SObj
 	}
 
 	trimmedLogFileContent := strings.Replace(string(logFileContent), "\n\n", "\n", -1)
+	debugLogger.Println("Got EventLogFile sObject log file content ID", data.ID())
+
 	reader := strings.NewReader(trimmedLogFileContent)
 	csvReader := csv.NewReader(reader)
 
