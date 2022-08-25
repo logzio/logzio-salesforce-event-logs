@@ -1,6 +1,6 @@
-# Logz.io Salesforce Logs Receiver
+# Salesforce Logs Receiver
 
-Collect sObjects data from Salesforce using this package.
+Collect sObjects data from Salesforce.
 
 ## Usage
 
