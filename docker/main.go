@@ -29,6 +29,10 @@ const (
 	defaultLogzioListenerURL = "https://listener.logz.io:8071"
 )
 
+var (
+	errorLogger = log.New(os.Stderr, "ERROR: ", log.Ldate|log.Ltime)
+)
+
 type salesforceCollector struct {
 	receiver *receiver.SalesforceLogsReceiver
 	shipper  *logzio.LogzioSender
@@ -130,21 +134,21 @@ func (sfc *salesforceCollector) collect() {
 
 			records, err := sfc.receiver.GetSObjectRecords(sObject)
 			if err != nil {
-				log.Println("error getting sObject ", sObject.SObjectType, " records: ", err)
+				errorLogger.Println("error getting sObject ", sObject.SObjectType, " records: ", err)
 				return
 			}
 
 			for _, record := range records {
 				data, createdDate, err := sfc.receiver.CollectSObjectRecord(&record)
 				if err != nil {
-					log.Println("error collecting sObject ", sObject.SObjectType, " record ID ", record.ID(), ": ", err)
+					errorLogger.Println("error collecting sObject ", sObject.SObjectType, " record ID ", record.ID(), ": ", err)
 					return
 				}
 
 				if strings.ToLower(sObject.SObjectType) == receiver.EventLogFileSObjectName {
 					enrichedData, err := sfc.receiver.EnrichEventLogFileSObjectData(&record, data)
 					if err != nil {
-						log.Println("error enriching EventLogFile sObject ", " record ID ", record.ID(), ": ", err)
+						errorLogger.Println("error enriching EventLogFile sObject ", " record ID ", record.ID(), ": ", err)
 						return
 					}
 
@@ -171,7 +175,7 @@ func (sfc *salesforceCollector) collect() {
 
 func (sfc *salesforceCollector) sendDataToLogzio(data []byte, sObjectName string, sObjectRecordID string) bool {
 	if err := sfc.shipper.Send(data); err != nil {
-		log.Println("error sending sObject ", sObjectName, " record ID ", sObjectRecordID, " to Logz.io: ", err)
+		errorLogger.Println("error sending sObject ", sObjectName, " record ID ", sObjectRecordID, " to Logz.io: ", err)
 		return false
 	}
 
