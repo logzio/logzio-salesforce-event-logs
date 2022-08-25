@@ -1,6 +1,6 @@
 module main
 
-go 1.18
+go 1.17
 
 require (
 	github.com/logzio/logzio-go v1.0.6
@@ -20,4 +20,5 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	golang.org/x/sys v0.0.0-20220128215802-99c3d69c2c27 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
