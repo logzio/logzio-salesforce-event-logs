@@ -14,22 +14,24 @@ import (
 )
 
 const (
-	salesforceURLEnvName     = "SALESFORCE_URL"
-	clientIDEnvName          = "CLIENT_ID"
-	apiVersionEnvName        = "API_VERSION"
-	usernameEnvName          = "USERNAME"
-	passwordEnvName          = "PASSWORD"
-	securityTokenEnvName     = "SECURITY_TOKEN"
-	sObjectTypesEnvName      = "SOBJECT_TYPES"
-	fromTimestampEnvName     = "FROM_TIMESTAMP"
-	intervalEnvName          = "INTERVAL"
-	logzioListenerURLEnvName = "LOGZIO_LISTENER_URL"
-	logzioTokenEnvName       = "LOGZIO_TOKEN"
+	envNameSalesforceURL     = "SALESFORCE_URL"
+	envNameClientID          = "CLIENT_ID"
+	envNameApiVersion        = "API_VERSION"
+	envNameUsername          = "USERNAME"
+	envNamePassword          = "PASSWORD"
+	envNameSecurityToken     = "SECURITY_TOKEN"
+	envNameSObjectTypes      = "SOBJECT_TYPES"
+	envNameFromTimestamp     = "FROM_TIMESTAMP"
+	envNameInterval          = "INTERVAL"
+	envNameLogzioListenerURL = "LOGZIO_LISTENER_URL"
+	envNameLogzioToken       = "LOGZIO_TOKEN"
 
+	defaultInterval          = 5
 	defaultLogzioListenerURL = "https://listener.logz.io:8071"
 )
 
 var (
+	infoLogger  = log.New(os.Stderr, "INFO: ", log.Ldate|log.Ltime)
 	errorLogger = log.New(os.Stderr, "ERROR: ", log.Ldate|log.Ltime)
 )
 
@@ -50,14 +52,16 @@ func newSalesforceCollector() (*salesforceCollector, error) {
 		return nil, fmt.Errorf("error creating Logz.io sender: %w", err)
 	}
 
-	intervalStr := os.Getenv(intervalEnvName)
+	intervalStr := os.Getenv(envNameInterval)
 	interval, err := strconv.Atoi(intervalStr)
 	if err != nil {
-		return nil, fmt.Errorf("interval must be a positive number")
+		infoLogger.Println("Interval is not a number. Used default value -", defaultInterval, "seconds")
+		interval = defaultInterval
 	}
 
 	if interval <= 0 {
-		return nil, fmt.Errorf("interval must be a positive number")
+		infoLogger.Println("Interval is not a positive number. Used default value -", defaultInterval, "seconds")
+		interval = defaultInterval
 	}
 
 	return &salesforceCollector{
@@ -68,9 +72,9 @@ func newSalesforceCollector() (*salesforceCollector, error) {
 }
 
 func createSalesforceReceiver() (*receiver.SalesforceLogsReceiver, error) {
-	sObjectTypesStr := os.Getenv(sObjectTypesEnvName)
-	sObjectTypes := strings.Split(strings.TrimSpace(sObjectTypesStr), ",")
-	latestTimestamp := os.Getenv(fromTimestampEnvName)
+	sObjectTypesStr := os.Getenv(envNameSObjectTypes)
+	sObjectTypes := strings.Split(strings.Replace(sObjectTypesStr, " ", "", -1), ",")
+	latestTimestamp := os.Getenv(envNameFromTimestamp)
 
 	var sObjects []*receiver.SObjectToCollect
 	for _, sObjectType := range sObjectTypes {
@@ -81,12 +85,12 @@ func createSalesforceReceiver() (*receiver.SalesforceLogsReceiver, error) {
 	}
 
 	rec, err := receiver.NewSalesforceLogsReceiver(
-		os.Getenv(salesforceURLEnvName),
-		os.Getenv(clientIDEnvName),
-		os.Getenv(apiVersionEnvName),
-		os.Getenv(usernameEnvName),
-		os.Getenv(passwordEnvName),
-		os.Getenv(securityTokenEnvName),
+		os.Getenv(envNameSalesforceURL),
+		os.Getenv(envNameClientID),
+		os.Getenv(envNameApiVersion),
+		os.Getenv(envNameUsername),
+		os.Getenv(envNamePassword),
+		os.Getenv(envNameSecurityToken),
 		sObjects)
 	if err != nil {
 		return nil, fmt.Errorf("error creating Salesforce logs receiver object: %w", err)
@@ -100,12 +104,12 @@ func createSalesforceReceiver() (*receiver.SalesforceLogsReceiver, error) {
 }
 
 func createLogzioSender() (*logzio.LogzioSender, error) {
-	logzioListenerURL := os.Getenv(logzioListenerURLEnvName)
+	logzioListenerURL := os.Getenv(envNameLogzioListenerURL)
 	if logzioListenerURL == "" {
 		logzioListenerURL = defaultLogzioListenerURL
 	}
 
-	logzioToken := os.Getenv(logzioTokenEnvName)
+	logzioToken := os.Getenv(envNameLogzioToken)
 	if logzioToken == "" {
 		return nil, fmt.Errorf("Logz.io token must have a value")
 	}

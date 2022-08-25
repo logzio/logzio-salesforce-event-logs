@@ -11,6 +11,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/avast/retry-go"
 	"github.com/simpleforce/simpleforce"
@@ -68,7 +69,10 @@ func NewSalesforceLogsReceiver(
 
 	for _, sObject := range sObjects {
 		if sObject.SObjectType == "" {
-			return nil, fmt.Errorf("sObject name must have a value")
+			return nil, fmt.Errorf("sObject type must have a value")
+		}
+		if _, err := time.Parse("2006-01-02T15:04:05.000Z", sObject.LatestTimestamp); err != nil {
+			return nil, fmt.Errorf("sObject latest timestamp must be in 2006-01-02T15:04:05.000Z format")
 		}
 	}
 
