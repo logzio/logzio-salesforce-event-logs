@@ -1,9 +1,9 @@
 # Salesforce Logs Receiver
 
-Collect sObjects data from Salesforce.
+A package for collecting sObjects data from Salesforce.
 
 ## Usage
 
-```
+```shell
 go get -u github.com/logzio/salesforce-logs-receiver
 ```
