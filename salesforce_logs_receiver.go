@@ -26,7 +26,7 @@ var (
 )
 
 type SalesforceLogsReceiver struct {
-	sObjects      []*SObjectToCollect
+	SObjects      []*SObjectToCollect
 	username      string
 	password      string
 	securityToken string
@@ -86,7 +86,7 @@ func NewSalesforceLogsReceiver(
 	}
 
 	return &SalesforceLogsReceiver{
-		sObjects:      sObjects,
+		SObjects:      sObjects,
 		username:      username,
 		password:      password,
 		securityToken: securityToken,
