@@ -13,7 +13,7 @@ docker pull logzio/logzio-salesforce-collector
 ## Run The Docker Container
 
 ```shell
- docker run run --name logzio-salesforce-collector \
+ docker run --name logzio-salesforce-collector \
  --env SALESFORCE_URL="<<SALESFORCE_URL>>" \
  --env CLIENT_ID="<<CLIENT_ID>>" \
  --env USERNAME="<<USERNAME>>" \
