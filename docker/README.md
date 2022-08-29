@@ -4,7 +4,7 @@ Collect sObjects data from Salesforce and ship them to Logz.io.
 
 ## Pull Docker Image
 
-Download the logzio-api-fetcher image:
+Download the logzio-salesforce-collector image:
 
 ```shell
 docker pull logzio/logzio-salesforce-collector
@@ -41,3 +41,7 @@ logzio/logzio-salesforce-collector
 | SALESFORCE_URL | Salesforce URL. | No | https://login.salesforce.com |
 | INTERVAL | The time interval to collect Salesforce data (in seconds). | No | 5 (seconds) |
 | LOGZIO_LISTENER_URL | Logz.io listener logs URL. | No | https://listener.logz.io:8071
+
+## Searching in Logz.io
+
+All logs will have the type `salesforce`.
