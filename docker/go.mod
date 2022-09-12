@@ -9,7 +9,7 @@ replace (
 
 require (
 	github.com/logzio/logzio-go v1.0.6
-	github.com/logzio/salesforce-logs-receiver v1.0.0
+	github.com/logzio/salesforce-logs-receiver v1.0.3
 )
 
 require (
