@@ -3,13 +3,13 @@ module main
 go 1.17
 
 replace (
-	github.com/logzio/salesforce-logs-receiver => ../
+	github.com/logzio/salesforce-logs-receiver => /go/src/logzio-salesforce-logs-receiver
 	gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.4.0
 )
 
 require (
 	github.com/logzio/logzio-go v1.0.6
-	github.com/logzio/salesforce-logs-receiver v1.0.3
+	github.com/logzio/salesforce-logs-receiver v1.0.0
 )
 
 require (

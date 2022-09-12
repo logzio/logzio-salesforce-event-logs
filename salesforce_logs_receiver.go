@@ -67,9 +67,15 @@ func NewSalesforceLogsReceiver(
 		return nil, fmt.Errorf("sObjects must have a value")
 	}
 
+	currentTimeMinusOneHour := time.Now().Add(-time.Hour * 1).Format("2006-01-02T15:04:05.000Z")
+
 	for _, sObject := range sObjects {
 		if sObject.SObjectType == "" {
 			return nil, fmt.Errorf("sObject type must have a value")
+		}
+		if sObject.LatestTimestamp == "" {
+			sObject.LatestTimestamp = currentTimeMinusOneHour
+			continue
 		}
 		if _, err := time.Parse("2006-01-02T15:04:05.000Z", sObject.LatestTimestamp); err != nil {
 			return nil, fmt.Errorf("sObject latest timestamp must be in 2006-01-02T15:04:05.000Z format")
