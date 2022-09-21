@@ -136,7 +136,7 @@ func (slr *SalesforceLogsReceiver) CollectSObjectRecord(record *simpleforce.SObj
 		return nil, nil, fmt.Errorf("error marshaling data from Salesforce API: %w", err)
 	}
 
-	jsonData, err = slr.addCustomFields(jsonData)
+	jsonData, err = slr.addCustomFields(jsonData, record.Type(), id)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error adding custom fields to data: %w", err)
 	}
@@ -148,7 +148,7 @@ func (slr *SalesforceLogsReceiver) CollectSObjectRecord(record *simpleforce.SObj
 	return jsonData, &createdDate, nil
 }
 
-func (slr *SalesforceLogsReceiver) addCustomFields(jsonData []byte) ([]byte, error) {
+func (slr *SalesforceLogsReceiver) addCustomFields(jsonData []byte, sObjectType string, recordID string) ([]byte, error) {
 	if len(slr.customFields) == 0 {
 		return jsonData, nil
 	}
@@ -158,7 +158,7 @@ func (slr *SalesforceLogsReceiver) addCustomFields(jsonData []byte) ([]byte, err
 		return nil, fmt.Errorf("error unmarshaling JSON data: %w", err)
 	}
 
-	for fieldKey, fieldValue := range jsonMap {
+	for fieldKey, fieldValue := range slr.customFields {
 		jsonMap[fieldKey] = fieldValue
 	}
 
@@ -167,6 +167,7 @@ func (slr *SalesforceLogsReceiver) addCustomFields(jsonData []byte) ([]byte, err
 		return nil, fmt.Errorf("error marshaling JSON data: %w", err)
 	}
 
+	debugLogger.Println("Added custom fields to data of sObject", sObjectType, "record ID", recordID)
 	return newJsonData, nil
 }
 
