@@ -31,6 +31,7 @@ type SalesforceLogsReceiver struct {
 	username      string
 	password      string
 	securityToken string
+	customFields  map[string]string
 	client        *simpleforce.Client
 }
 
@@ -46,7 +47,8 @@ func NewSalesforceLogsReceiver(
 	username string,
 	password string,
 	securityToken string,
-	sObjects []*SObjectToCollect) (*SalesforceLogsReceiver, error) {
+	sObjects []*SObjectToCollect,
+	customFields map[string]string) (*SalesforceLogsReceiver, error) {
 	if clientID == "" {
 		return nil, fmt.Errorf("client ID must have a value")
 	}
@@ -100,6 +102,7 @@ func NewSalesforceLogsReceiver(
 		username:      username,
 		password:      password,
 		securityToken: securityToken,
+		customFields:  customFields,
 		client:        client,
 	}, nil
 }
@@ -133,11 +136,38 @@ func (slr *SalesforceLogsReceiver) CollectSObjectRecord(record *simpleforce.SObj
 		return nil, nil, fmt.Errorf("error marshaling data from Salesforce API: %w", err)
 	}
 
+	jsonData, err = slr.addCustomFields(jsonData)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error adding custom fields to data: %w", err)
+	}
+
 	createdDate := record.StringField("CreatedDate")
 	createdDate = strings.Replace(createdDate, "+0000", "Z", 1)
 
 	debugLogger.Println("Collected data of sObject", record.Type(), "record ID", id)
 	return jsonData, &createdDate, nil
+}
+
+func (slr *SalesforceLogsReceiver) addCustomFields(jsonData []byte) ([]byte, error) {
+	if len(slr.customFields) == 0 {
+		return jsonData, nil
+	}
+
+	var jsonMap map[string]interface{}
+	if err := json.Unmarshal(jsonData, &jsonMap); err != nil {
+		return nil, fmt.Errorf("error unmarshaling JSON data: %w", err)
+	}
+
+	for fieldKey, fieldValue := range jsonMap {
+		jsonMap[fieldKey] = fieldValue
+	}
+
+	newJsonData, err := json.Marshal(jsonMap)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling JSON data: %w", err)
+	}
+
+	return newJsonData, nil
 }
 
 func (slr *SalesforceLogsReceiver) EnrichEventLogFileSObjectData(data *simpleforce.SObject, jsonData []byte) ([][]byte, error) {
@@ -186,7 +216,7 @@ func (slr *SalesforceLogsReceiver) getEventLogFileContent(data *simpleforce.SObj
 			continue
 		}
 
-		logEvent := make(map[string]interface{}, 0)
+		logEvent := make(map[string]interface{})
 		for fieldIndex, field := range row {
 			key := csvData[0][fieldIndex]
 			logEvent[key] = field
@@ -251,15 +281,13 @@ func (slr *SalesforceLogsReceiver) getFileContent(apiPath string) ([]byte, error
 
 func addEventLogToJsonData(eventLog map[string]interface{}, jsonData []byte) ([]byte, error) {
 	var jsonMap map[string]interface{}
-	err := json.Unmarshal(jsonData, &jsonMap)
-	if err != nil {
+	if err := json.Unmarshal(jsonData, &jsonMap); err != nil {
 		return nil, fmt.Errorf("error unmarshaling JSON data: %w", err)
 	}
 
 	jsonMap["LogFileContent"] = eventLog
 
-	var newJsonData []byte
-	newJsonData, err = json.Marshal(jsonMap)
+	newJsonData, err := json.Marshal(jsonMap)
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling JSON data: %w", err)
 	}

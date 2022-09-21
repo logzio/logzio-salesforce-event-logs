@@ -23,6 +23,7 @@ const (
 	envNameSObjectTypes      = "SOBJECT_TYPES"
 	envNameFromTimestamp     = "FROM_TIMESTAMP"
 	envNameInterval          = "INTERVAL"
+	envNameCustomFields      = "CUSTOM_FIELDS"
 	envNameLogzioListenerURL = "LOGZIO_LISTENER_URL"
 	envNameLogzioToken       = "LOGZIO_TOKEN"
 
@@ -84,6 +85,22 @@ func createSalesforceReceiver() (*receiver.SalesforceLogsReceiver, error) {
 		})
 	}
 
+	customFieldsStr := os.Getenv(envNameCustomFields)
+	customFields := make(map[string]string)
+
+	if customFieldsStr != "" {
+		fields := strings.Split(customFieldsStr, ",")
+
+		for _, field := range fields {
+			if !strings.Contains(field, ":") {
+				return nil, fmt.Errorf("each field in %s must have ':' separator between the field key and value", envNameCustomFields)
+			}
+
+			fieldKeyAndValue := strings.Split(field, ":")
+			customFields[fieldKeyAndValue[0]] = fieldKeyAndValue[1]
+		}
+	}
+
 	rec, err := receiver.NewSalesforceLogsReceiver(
 		os.Getenv(envNameSalesforceURL),
 		os.Getenv(envNameClientID),
@@ -91,7 +108,8 @@ func createSalesforceReceiver() (*receiver.SalesforceLogsReceiver, error) {
 		os.Getenv(envNameUsername),
 		os.Getenv(envNamePassword),
 		os.Getenv(envNameSecurityToken),
-		sObjects)
+		sObjects,
+		customFields)
 	if err != nil {
 		return nil, fmt.Errorf("error creating Salesforce logs receiver object: %w", err)
 	}
