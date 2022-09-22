@@ -150,6 +150,7 @@ func (sfc *salesforceCollector) collect() {
 	var waitGroup sync.WaitGroup
 
 	for _, sObject := range sfc.receiver.SObjects {
+		debugLogger.Println("sObject type:", sObject.SObjectType, "- from timestamp:", sObject.LatestTimestamp)
 		waitGroup.Add(1)
 
 		go func(sObject *receiver.SObjectToCollect) {
