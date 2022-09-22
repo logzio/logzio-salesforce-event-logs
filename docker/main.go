@@ -32,6 +32,7 @@ const (
 )
 
 var (
+	debugLogger = log.New(os.Stderr, "DEBUG: ", log.Ldate|log.Ltime)
 	infoLogger  = log.New(os.Stderr, "INFO: ", log.Ldate|log.Ltime)
 	errorLogger = log.New(os.Stderr, "ERROR: ", log.Ldate|log.Ltime)
 )
@@ -211,6 +212,7 @@ func main() {
 
 	for {
 		collector.collect()
+		debugLogger.Println("Finished collecting. Collector will run in", collector.interval, "seconds")
 		time.Sleep(time.Duration(collector.interval) * time.Second)
 
 		if err = collector.receiver.LoginSalesforce(); err != nil {
