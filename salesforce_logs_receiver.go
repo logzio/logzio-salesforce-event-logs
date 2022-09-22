@@ -177,7 +177,7 @@ func (slr *SalesforceLogsReceiver) EnrichEventLogFileSObjectData(data *simplefor
 		return nil, fmt.Errorf("error getting EventLogFile sObject log file content: %w", err)
 	}
 
-	debugLogger.Println("Got", len(eventLogRows), "events from EventLogFile sObject ID", data.ID())
+	debugLogger.Println("Got", len(eventLogRows), "logs from EventLogFile sObject ID", data.ID())
 
 	var jsonsData [][]byte
 	for _, eventLogRow := range eventLogRows {
@@ -189,7 +189,7 @@ func (slr *SalesforceLogsReceiver) EnrichEventLogFileSObjectData(data *simplefor
 		jsonsData = append(jsonsData, newJsonData)
 	}
 
-	debugLogger.Println("Enriched JSON data with", len(jsonsData), "events from EventLogFile sObject ID", data.ID())
+	debugLogger.Println("Enriched sObject data with", len(jsonsData), "logs from EventLogFile sObject ID", data.ID())
 	return jsonsData, nil
 }
 
