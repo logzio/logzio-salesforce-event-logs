@@ -188,10 +188,9 @@ func (sfc *salesforceCollector) collect() {
 				sObject.LatestTimestamp = *createdDate
 			}
 		}(sObject)
-
-		waitGroup.Wait()
 	}
 
+	waitGroup.Wait()
 	sfc.shipper.Stop()
 }
 
