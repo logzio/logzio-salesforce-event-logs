@@ -23,6 +23,7 @@ const (
 	envNameSObjectTypes      = "SOBJECT_TYPES"
 	envNameFromTimestamp     = "FROM_TIMESTAMP"
 	envNameInterval          = "INTERVAL"
+	envNameCustomFields      = "CUSTOM_FIELDS"
 	envNameLogzioListenerURL = "LOGZIO_LISTENER_URL"
 	envNameLogzioToken       = "LOGZIO_TOKEN"
 
@@ -31,6 +32,7 @@ const (
 )
 
 var (
+	debugLogger = log.New(os.Stderr, "DEBUG: ", log.Ldate|log.Ltime)
 	infoLogger  = log.New(os.Stderr, "INFO: ", log.Ldate|log.Ltime)
 	errorLogger = log.New(os.Stderr, "ERROR: ", log.Ldate|log.Ltime)
 )
@@ -84,6 +86,22 @@ func createSalesforceReceiver() (*receiver.SalesforceLogsReceiver, error) {
 		})
 	}
 
+	customFieldsStr := os.Getenv(envNameCustomFields)
+	customFields := make(map[string]string)
+
+	if customFieldsStr != "" {
+		fields := strings.Split(customFieldsStr, ",")
+
+		for _, field := range fields {
+			if !strings.Contains(field, ":") {
+				return nil, fmt.Errorf("each field in %s must have ':' separator between the field key and value", envNameCustomFields)
+			}
+
+			fieldKeyAndValue := strings.Split(field, ":")
+			customFields[fieldKeyAndValue[0]] = fieldKeyAndValue[1]
+		}
+	}
+
 	rec, err := receiver.NewSalesforceLogsReceiver(
 		os.Getenv(envNameSalesforceURL),
 		os.Getenv(envNameClientID),
@@ -91,7 +109,8 @@ func createSalesforceReceiver() (*receiver.SalesforceLogsReceiver, error) {
 		os.Getenv(envNameUsername),
 		os.Getenv(envNamePassword),
 		os.Getenv(envNameSecurityToken),
-		sObjects)
+		sObjects,
+		customFields)
 	if err != nil {
 		return nil, fmt.Errorf("error creating Salesforce logs receiver object: %w", err)
 	}
@@ -131,6 +150,7 @@ func (sfc *salesforceCollector) collect() {
 	var waitGroup sync.WaitGroup
 
 	for _, sObject := range sfc.receiver.SObjects {
+		debugLogger.Println("sObject type:", sObject.SObjectType, "- from timestamp:", sObject.LatestTimestamp)
 		waitGroup.Add(1)
 
 		go func(sObject *receiver.SObjectToCollect) {
@@ -170,11 +190,9 @@ func (sfc *salesforceCollector) collect() {
 				sObject.LatestTimestamp = *createdDate
 			}
 		}(sObject)
-
-		waitGroup.Wait()
 	}
 
-	sfc.shipper.Stop()
+	waitGroup.Wait()
 }
 
 func (sfc *salesforceCollector) sendDataToLogzio(data []byte, sObjectName string, sObjectRecordID string) bool {
@@ -194,6 +212,7 @@ func main() {
 
 	for {
 		collector.collect()
+		debugLogger.Println("Finished collecting. Collector will run in", collector.interval, "seconds")
 		time.Sleep(time.Duration(collector.interval) * time.Second)
 
 		if err = collector.receiver.LoginSalesforce(); err != nil {
