@@ -192,7 +192,6 @@ func (sfc *salesforceCollector) collect() {
 	}
 
 	waitGroup.Wait()
-	sfc.shipper.Stop()
 }
 
 func (sfc *salesforceCollector) sendDataToLogzio(data []byte, sObjectName string, sObjectRecordID string) bool {

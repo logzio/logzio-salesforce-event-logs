@@ -117,7 +117,7 @@ func (slr *SalesforceLogsReceiver) LoginSalesforce() error {
 }
 
 func (slr *SalesforceLogsReceiver) GetSObjectRecords(sObject *SObjectToCollect) ([]simpleforce.SObject, error) {
-	query := fmt.Sprintf("SELECT Id,CreatedDate FROM %s WHERE CreatedDate > %s", sObject.SObjectType, sObject.LatestTimestamp)
+	query := fmt.Sprintf("SELECT Id,CreatedDate FROM %s WHERE CreatedDate > %s ORDER BY CreatedDate", sObject.SObjectType, sObject.LatestTimestamp)
 	result, err := slr.client.Query(query)
 	if err != nil {
 		return nil, fmt.Errorf("error querying Salesforce API: %w", err)
